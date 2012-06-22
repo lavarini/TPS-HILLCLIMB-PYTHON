@@ -1,0 +1,57 @@
+from optimise import ObjectiveFunction
+
+import random
+import math
+import logging
+
+def P(prev_score,next_score,temperature):
+    if next_score > prev_score:
+        return 1.0
+    else:
+        return math.exp( -abs(next_score-prev_score)/temperature )
+
+def kirkpatrick_cooling(start_temp,alpha):
+    T=start_temp
+    while True:
+        yield T
+        T=alpha*T
+
+def anneal(init_function,move_operator,objective_function,max_evaluations,start_temp,alpha):
+    
+    # wrap the objective function (so we record the best)
+    objective_function=ObjectiveFunction(objective_function)
+    
+    current=init_function()
+    current_score=objective_function(current)
+    num_evaluations=1
+    
+    cooling_schedule=kirkpatrick_cooling(start_temp,alpha)
+    
+    logging.info('anneal started: score=%f',current_score)
+    
+    for temperature in cooling_schedule:
+        done = False
+        # examine moves around our current position
+        for next in move_operator(current):
+            if num_evaluations >= max_evaluations:
+                done=True
+                break
+            
+            next_score=objective_function(next)
+            num_evaluations+=1
+            
+            # probablistically accept this solution
+            # always accepting better solutions
+            p=P(current_score,next_score,temperature)
+            if random.random() < p:
+                current=next
+                current_score=next_score
+                break
+        # see if completely finished
+        if done: break
+    
+    best_score=objective_function.best_score
+    best=objective_function.best
+    logging.info('final temperature: %f',temperature)
+    logging.info('anneal finished: num_evaluations=%d, best_score=%f',num_evaluations,best_score)
+    return (num_evaluations,best_score,best)
